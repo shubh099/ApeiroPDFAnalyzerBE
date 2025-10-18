@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 import uuid
 from dotenv import load_dotenv
-from gemini_extractor import extract_tables_from_pdf, get_extraction_summary
+from app.gemini_extractor import extract_tables_from_pdf, get_extraction_summary
 
 # Load environment variables
 load_dotenv()
