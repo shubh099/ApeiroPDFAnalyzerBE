@@ -15,7 +15,7 @@ app = FastAPI(title="PDF Intelligence API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Vite default port
+    allow_origins=["http://localhost:5173", "http://localhost:3000", "https://apeiro-pdf-analyzer-fe.vercel.app"],  # Vite default port
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
