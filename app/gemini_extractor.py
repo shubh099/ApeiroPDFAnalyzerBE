@@ -11,9 +11,6 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-from dotenv import load_dotenv
-load_dotenv(dotenv_path=Path('..') / '.env')
 
 # Configure Gemini API
 api_key = os.environ.get("GEMINI_API_KEY")
