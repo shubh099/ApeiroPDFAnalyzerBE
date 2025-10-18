@@ -3,22 +3,16 @@ import google.generativeai as genai
 import anthropic
 import httpx
 import os
-from dotenv import load_dotenv
-from pathlib import Path
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
-
-# Load environment variables
-load_dotenv(dotenv_path=Path('..') / '.env')
 
 # Configure Gemini API
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 def get_anthropic_client():
     """Get Anthropic client for web search clarifications."""
     # Create httpx client without proxies to avoid compatibility issues
     http_client = httpx.Client()
     return anthropic.Anthropic(
-        api_key=os.getenv("ANTHROPIC_API_KEY"),
+        api_key=os.environ.get("ANTHROPIC_API_KEY"),
         http_client=http_client
     )
 

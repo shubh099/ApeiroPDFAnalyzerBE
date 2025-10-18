@@ -6,11 +6,9 @@ import os
 import shutil
 from pathlib import Path
 import uuid
-from dotenv import load_dotenv
 from app.gemini_extractor import extract_tables_from_pdf, get_extraction_summary
 import uvicorn
-# Load environment variables
-load_dotenv()
+
 
 app = FastAPI(title="PDF Intelligence API")
 
