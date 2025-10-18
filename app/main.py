@@ -8,7 +8,7 @@ from pathlib import Path
 import uuid
 from dotenv import load_dotenv
 from app.gemini_extractor import extract_tables_from_pdf, get_extraction_summary
-
+import uvicorn
 # Load environment variables
 load_dotenv()
 
@@ -173,6 +173,7 @@ async def global_exception_handler(request, exc):
     )
 
 
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+if __name__ == "__main__":
+
+    if os.environ.get("RAILWAY_ENVIRONMENT", "local") == "local":
+        uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
