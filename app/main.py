@@ -118,7 +118,7 @@ async def extract_pdf_tables(file_id: str):
         )
 
 
-from analysis_engine import detect_contradictions, find_gaps, get_clarification
+from app.analysis_engine import detect_contradictions, find_gaps, get_clarification
 
 
 @app.post("/analyze/contradictions")
