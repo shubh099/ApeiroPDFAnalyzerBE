@@ -16,6 +16,72 @@ def get_anthropic_client():
         http_client=http_client
     )
 
+def enrich_context_with_web_search(document_context: str) -> str:
+    """
+    Use Claude with web search to understand healthcare fund structure and policy context.
+
+    This function enhances the basic document summary with policy knowledge from web search,
+    enabling more accurate contradiction and gap detection by Gemini.
+
+    Args:
+        document_context: Basic document summary extracted by Gemini
+
+    Returns:
+        Enriched context with policy knowledge from web search.
+        Returns empty string if document_context is empty or if an error occurs.
+    """
+    # Safety check: if no context provided, return empty string
+    if not document_context or not document_context.strip():
+        return ""
+
+    try:
+        prompt = f"""You are analyzing a healthcare insurance policy document.
+
+Document Summary: {document_context}
+
+Task: Research and provide context about:
+1. How these healthcare funds typically work (PRIMARY HEALTHCARE FUND, SOCIAL HEALTH INSURANCE FUND, EMERGENCY FUND, etc.)
+2. The relationship between different fund types and their purposes
+3. Policy guidelines for benefit packages and tariffs
+4. Any relevant government healthcare regulations or standards
+5. How contradictions and gaps should be evaluated in this context
+
+Use web search to find official sources. Provide a comprehensive but concise context (3-5 paragraphs) that will help an AI system accurately detect contradictions and coverage gaps.
+
+Focus on factual, authoritative information from official healthcare policy sources, government health ministries, WHO guidelines, and healthcare standards.
+
+Return the enriched context as plain text (no markdown formatting).
+"""
+
+        client = get_anthropic_client()
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=3000,
+            tools=[{
+                "type": "web_search_20250305",
+                "name": "web_search"
+            }],
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        # Extract text from response (handle tool use if present)
+        enriched_context = ""
+        for block in response.content:
+            if block.type == "text":
+                enriched_context += block.text
+
+        # Safety check: if no enriched context generated, return original
+        if not enriched_context or not enriched_context.strip():
+            return document_context
+
+        return enriched_context
+
+    except Exception as e:
+        # On any error, return original document_context to maintain functionality
+        # This ensures the system degrades gracefully
+        print(f"Warning: Context enrichment failed: {e}. Using original context.")
+        return document_context
+
 def build_service_registry(tables_data: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
     """
     Creates a dictionary mapping service names to all their instances across tables.
@@ -47,14 +113,33 @@ def format_instances_for_prompt(instances: List[Dict[str, Any]]) -> str:
         formatted_instances.append(f"Instance {i}:\n" + json.dumps(instance, indent=2))
     return "\n".join(formatted_instances)
 
-def analyze_contradiction(service_name: str, instances: List[Dict[str, Any]]) -> Dict[str, Any]:
+def analyze_contradiction(service_name: str, instances: List[Dict[str, Any]], enriched_context: str = "") -> Dict[str, Any]:
     """
-    Use Claude to determine if instances represent a true contradiction.
+    Use Gemini 2.5 Pro to determine if instances represent a true contradiction.
+
+    Args:
+        service_name: Name of the service being analyzed
+        instances: List of service instances across different packages
+        enriched_context: Optional policy context from web search (default: "")
+
+    Returns:
+        Dictionary with contradiction analysis results
     """
-    
+
+    # Build prompt with optional enriched context
+    context_section = ""
+    if enriched_context and enriched_context.strip():
+        context_section = f"""
+POLICY CONTEXT (from web research):
+{enriched_context}
+
+Use this context to understand how different healthcare funds work and evaluate contradictions accordingly.
+
+"""
+
     prompt = f"""You are analyzing healthcare insurance policy contradictions.
 
-Service: "{service_name}"
+{context_section}Service: "{service_name}"
 
 Instances found across different packages:
 {format_instances_for_prompt(instances)}
@@ -66,6 +151,7 @@ Consider:
 - Conflicting eligibility criteria (age, frequency, etc.)
 - Coverage conflicts (included in one, excluded in another)
 - Ambiguous or unclear rules that could cause confusion
+- Whether differences are legitimate (e.g., different fund types have different purposes)
 
 Return ONLY a valid JSON object (no markdown, no explanation):
 {{
@@ -91,9 +177,16 @@ If no contradiction exists, set has_contradiction to false and provide minimal o
 
     return json.loads(response.text)
 
-def detect_contradictions(tables_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def detect_contradictions(tables_data: List[Dict[str, Any]], enriched_context: str = "") -> List[Dict[str, Any]]:
     """
     Detects contradictions in the extracted table data.
+
+    Args:
+        tables_data: List of extracted tables
+        enriched_context: Optional enriched context from web search (default: "")
+
+    Returns:
+        List of contradictions found
     """
     service_registry = build_service_registry(tables_data)
     potential_contradictions = {
@@ -101,10 +194,10 @@ def detect_contradictions(tables_data: List[Dict[str, Any]]) -> List[Dict[str, A
         for service, instances in service_registry.items()
         if len(instances) > 1
     }
-    
+
     contradictions = []
     for service, instances in potential_contradictions.items():
-        analysis = analyze_contradiction(service, instances)
+        analysis = analyze_contradiction(service, instances, enriched_context)
         
         if analysis['has_contradiction']:
             contradictions.append({
@@ -157,14 +250,33 @@ def format_tables_summary(tables_data: List[Dict[str, Any]]) -> str:
         summary.append(f"- Fund: {table['fund']}, Category: {table['category']}")
     return "\n".join(summary)
 
-def analyze_gaps(entities: Dict[str, List[str]], tables_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def analyze_gaps(entities: Dict[str, List[str]], tables_data: List[Dict[str, Any]], enriched_context: str = "") -> List[Dict[str, Any]]:
     """
-    Use Claude to identify coverage gaps.
+    Use Gemini 2.5 Pro to identify coverage gaps.
+
+    Args:
+        entities: Extracted entities (conditions, services, undefined terms)
+        tables_data: List of extracted tables
+        enriched_context: Optional policy context from web search (default: "")
+
+    Returns:
+        List of gaps found
     """
-    
+
+    # Build prompt with optional enriched context
+    context_section = ""
+    if enriched_context and enriched_context.strip():
+        context_section = f"""
+POLICY CONTEXT (from web research):
+{enriched_context}
+
+Use this context to understand what coverage should be expected and identify genuine gaps.
+
+"""
+
     prompt = f"""You are analyzing healthcare insurance coverage for gaps and ambiguities.
 
-Extracted Data:
+{context_section}Extracted Data:
 - Conditions mentioned: {entities['conditions']}
 - Services available: {entities['services']}
 - Undefined terms: {entities['undefined_terms']}
@@ -176,6 +288,7 @@ Task: Identify gaps where:
 1. A condition is mentioned but has no clear treatment path or coverage
 2. A service is mentioned but lacks definition or pricing
 3. Terms are used without clear definition, creating ambiguity for patients/providers
+4. Expected coverage is missing based on standard healthcare policy practices
 
 Return ONLY a valid JSON array (no markdown):
 [
@@ -205,12 +318,19 @@ Return empty array [] if no significant gaps found.
 
     return json.loads(response.text)
 
-def find_gaps(tables_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def find_gaps(tables_data: List[Dict[str, Any]], enriched_context: str = "") -> List[Dict[str, Any]]:
     """
     Finds gaps in the extracted table data.
+
+    Args:
+        tables_data: List of extracted tables
+        enriched_context: Optional enriched context from web search (default: "")
+
+    Returns:
+        List of gaps found
     """
     entities = extract_entities(tables_data)
-    gaps = analyze_gaps(entities, tables_data)
+    gaps = analyze_gaps(entities, tables_data, enriched_context)
     return gaps
 
 def get_clarification(finding: Dict[str, Any], pdf_context: str) -> str:
