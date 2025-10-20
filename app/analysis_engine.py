@@ -170,10 +170,21 @@ If no contradiction exists, set has_contradiction to false and provide minimal o
         prompt,
         generation_config={
             "temperature": 0.2,  # Slightly increased for more nuanced results
-            "max_output_tokens": 2000,
+            "max_output_tokens": 8000,  # Increased to handle enriched context
             "response_mime_type": "application/json"
         }
     )
+
+    # Check if response has valid content
+    if not response.candidates or len(response.candidates) == 0:
+        return {"has_contradiction": False, "severity": "low", "issue": "", "evidence": [], "impact": ""}
+
+    # Check finish reason
+    candidate = response.candidates[0]
+    if candidate.finish_reason != 1:  # 1 = STOP (normal completion)
+        # finish_reason 2 = MAX_TOKENS, 3 = SAFETY, 4 = RECITATION, 5 = OTHER
+        print(f"Warning: Gemini response blocked. Finish reason: {candidate.finish_reason}")
+        return {"has_contradiction": False, "severity": "low", "issue": "", "evidence": [], "impact": ""}
 
     return json.loads(response.text)
 
@@ -311,10 +322,21 @@ Return empty array [] if no significant gaps found.
         prompt,
         generation_config={
             "temperature": 0.2,  # Slightly increased for more nuanced results
-            "max_output_tokens": 3000,
+            "max_output_tokens": 8000,  # Increased to handle enriched context
             "response_mime_type": "application/json"
         }
     )
+
+    # Check if response has valid content
+    if not response.candidates or len(response.candidates) == 0:
+        return []
+
+    # Check finish reason
+    candidate = response.candidates[0]
+    if candidate.finish_reason != 1:  # 1 = STOP (normal completion)
+        # finish_reason 2 = MAX_TOKENS, 3 = SAFETY, 4 = RECITATION, 5 = OTHER
+        print(f"Warning: Gemini response blocked in gap analysis. Finish reason: {candidate.finish_reason}")
+        return []
 
     return json.loads(response.text)
 
