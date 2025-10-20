@@ -23,18 +23,22 @@ EXTRACTION_PROMPT = """You will be given a PDF document containing benefit packa
 
 **Instructions:**
 
-1.  **Extraction Schema:** The tables you must extract follow a specific nested structure:
+1.  **Document Context (New):**
+    * First, provide a brief overview of the document as a string in the \"document_context\" field.
+    * This should be 2-3 sentences summarizing: document title, purpose, main funds covered, and any key information about the healthcare benefit packages.
+
+2.  **Extraction Schema:** The tables you must extract follow a specific nested structure:
     * They are grouped under **major headings** (e.g., \"PRIMARY HEALTHCARE FUND\", \"SOCIAL HEALTH INSURANCE FUND\"). These will be the parent topics.
     * Within each major heading, there are **sub-topic tables** (e.g., \"OUTPATIENT CARE SERVICES\", \"RENAL CARE PACKAGE\").
     * These sub-topic tables always have four columns: \"Scope\", \"Access Point\", \"Tariff\", and \"Access Rules\".
 
-2.  **Exclusion Rule (Crucial):**
+3.  **Exclusion Rule (Crucial):**
     * You **MUST STOP** processing when you reach the heading \"ANNEX 1 - SURGICAL PACKAGE\".
     * Do **NOT** include any data from \"ANNEX 1\" or any content that follows it.
 
-3.  **JSON Format:**
+4.  **JSON Format:**
     * The final output MUST be a single JSON object.
-    * The structure must be: `{\"PARENT_TOPIC\": [{\"CHILD_SUBTOPIC\": {\"Scope\": [], \"Access Point\": [], \"Tariff\": [], \"Access Rules\": []}}]}`
+    * The structure must be: `{\"document_context\": \"...\", \"PARENT_TOPIC\": [{\"CHILD_SUBTOPIC\": {\"Scope\": [], \"Access Point\": [], \"Tariff\": [], \"Access Rules\": []}}]}`
     * Collect all text from a single cell into one string, even if it has multiple lines.
 
 Do not include any other text or explanations in your response outside of the final, valid JSON object.
@@ -43,6 +47,7 @@ Do not include any other text or explanations in your response outside of the fi
 
 ```json
 {
+  \"document_context\": \"This document outlines the benefit package tariffs for the national healthcare system, covering PRIMARY HEALTHCARE FUND, SOCIAL HEALTH INSURANCE FUND, and EMERGENCY, CHRONIC AND CRITICAL ILLNESS FUND. It specifies covered services, access points, tariffs, and access rules for various healthcare services.\",
   \"PRIMARY HEALTHCARE FUND\": [
     {
       \"OUTPATIENT CARE SERVICES\": {
@@ -232,7 +237,16 @@ def transform_gemini_output_to_frontend_format(gemini_data: Dict[str, Any]) -> L
 
     transformed_tables = []
 
+    # Extract document_context if present (will be processed separately)
+    document_context = gemini_data.get("document_context", "")
+    if document_context:
+        logger.info(f"Document context extracted: {document_context[:100]}...")
+
     for key, value in gemini_data.items():
+        # Skip document_context as it's not table data
+        if key == "document_context":
+            continue
+
         # Case 1: Main Benefit Tables (list of subtopics)
         if isinstance(value, list):
             fund = key
@@ -295,7 +309,7 @@ def transform_gemini_output_to_frontend_format(gemini_data: Dict[str, Any]) -> L
     logger.info(f"{'='*60}\n")
 
     return {
-        "document_context": gemini_data.get("document_context", ""),
+        "document_context": document_context,
         "tables": transformed_tables
     }
 
