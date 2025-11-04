@@ -91,7 +91,7 @@ Do not include any other text or explanations in your response outside of the fi
 
 def extract_tables_with_gemini(pdf_path: str) -> Dict[str, Any]:
     """
-    Extract tables from PDF using Gemini 2.0 Flash with inline base64 encoding.
+    Extract tables from PDF using Gemini 2.5 Flash with inline base64 encoding.
 
     Args:
         pdf_path: Path to the PDF file
@@ -113,9 +113,9 @@ def extract_tables_with_gemini(pdf_path: str) -> Dict[str, Any]:
         pdf_base64 = base64.b64encode(pdf_data).decode('utf-8')
         logger.info(f"✓ PDF file encoded successfully ({len(pdf_data)} bytes)")
 
-        # Use Gemini 2.5 Pro model (latest available)
-        model = genai.GenerativeModel("models/gemini-2.5-pro")
-        logger.info(f"✓ Using model: models/gemini-2.5-pro")
+        # Use Gemini 2.5 Flash model (latest available)
+        model = genai.GenerativeModel("models/gemini-2.5-flash")
+        logger.info(f"✓ Using model: models/gemini-2.5-flash")
 
         # Create multimodal content with text prompt and inline PDF data
         logger.info("\nSending extraction request to Gemini...")
